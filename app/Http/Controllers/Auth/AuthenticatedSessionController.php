@@ -4,48 +4,59 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
-use Inertia\Response;
+use App\Services\User\UserService;
+use Illuminate\Auth\AuthenticationException;
+use Illuminate\Http\JsonResponse;
 
 class AuthenticatedSessionController extends Controller
 {
-    /**
-     * Show the login page.
-     */
-    public function create(Request $request): Response
-    {
-        return Inertia::render('auth/Login', [
-            'canResetPassword' => Route::has('password.request'),
-            'status' => $request->session()->get('status'),
-        ]);
-    }
+    public function __construct(protected UserService $userService) {}
 
     /**
      * Handle an incoming authentication request.
      */
-    public function store(LoginRequest $request): RedirectResponse
+    public function login(LoginRequest $request): JsonResponse
     {
-        $request->authenticate();
+        try {
+            $result = $this->userService->login($request->validated());
 
-        $request->session()->regenerate();
-
-        return redirect()->intended(route('dashboard', absolute: false));
+            return response()->json([
+                'success' => true,
+                'message' => 'Đăng nhập thành công.',
+                'data' => $result,
+            ]);
+        } catch (AuthenticationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 401);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Đăng nhập thất bại.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
     }
 
     /**
      * Destroy an authenticated session.
      */
-    public function destroy(Request $request): RedirectResponse
+    public function logout(): JsonResponse
     {
-        Auth::guard('web')->logout();
+        try {
+            $this->userService->logout();
 
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
-
-        return redirect('/');
+            return response()->json([
+                'success' => true,
+                'message' => 'Đăng xuất thành công.',
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Đăng xuất thất bại.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
     }
 }

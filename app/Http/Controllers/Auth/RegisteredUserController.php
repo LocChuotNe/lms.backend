@@ -3,49 +3,38 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
-use Illuminate\Auth\Events\Registered;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rules;
-use Inertia\Inertia;
-use Inertia\Response;
+use App\Http\Requests\Auth\RegisterRequest;
+use App\Services\User\UserService;
+use Illuminate\Http\JsonResponse;
 
 class RegisteredUserController extends Controller
 {
     /**
      * Show the registration page.
      */
-    public function create(): Response
-    {
-        return Inertia::render('auth/Register');
-    }
+    public function __construct(protected UserService $userService) {}
+
 
     /**
      * Handle an incoming registration request.
      *
      * @throws \Illuminate\Validation\ValidationException
      */
-    public function store(Request $request): RedirectResponse
+    public function register(RegisterRequest $request): JsonResponse
     {
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|string|lowercase|email|max:255|unique:'.User::class,
-            'password' => ['required', 'confirmed', Rules\Password::defaults()],
+       try {
+        $result = $this->userService->register($request->validated());
+        return response()->json([
+            'success'   => true,
+            'message'   => 'Dang ky thanh cong',
+            'data'      => $result,
         ]);
-
-        $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-        ]);
-
-        event(new Registered($user));
-
-        Auth::login($user);
-
-        return to_route('dashboard');
+       } catch (\Exception $e) {
+            return response()->json([
+                'succsess'  => false,
+                'message'   => 'Dang ky that bai',
+                'error'      =>$e->getMessage(),
+            ], 500);
+       }
     }
 }

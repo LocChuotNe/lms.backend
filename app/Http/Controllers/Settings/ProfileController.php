@@ -1,63 +1,55 @@
 <?php
 
 namespace App\Http\Controllers\Settings;
-
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Settings\ProfileUpdateRequest;
-use Illuminate\Contracts\Auth\MustVerifyEmail;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Inertia\Inertia;
-use Inertia\Response;
+use App\Http\Requests\ProfileUpdateRequest;
+use App\Services\User\UserService;
+use Illuminate\Http\JsonResponse;
 
 class ProfileController extends Controller
 {
-    /**
-     * Show the user's profile settings page.
-     */
-    public function edit(Request $request): Response
-    {
-        return Inertia::render('settings/Profile', [
-            'mustVerifyEmail' => $request->user() instanceof MustVerifyEmail,
-            'status' => $request->session()->get('status'),
-        ]);
-    }
+    public function __construct(protected UserService $userService) {}
 
     /**
-     * Update the user's profile information.
+     * Get user profile.
      */
-    public function update(ProfileUpdateRequest $request): RedirectResponse
+    public function show(): JsonResponse
     {
-        $request->user()->fill($request->validated());
+        try {
+            $user = $this->userService->getProfile();
 
-        if ($request->user()->isDirty('email')) {
-            $request->user()->email_verified_at = null;
+            return response()->json([
+                'success' => true,
+                'data' => $user,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Không thể lấy thông tin profile.',
+                'error' => $e->getMessage(),
+            ], 500);
         }
-
-        $request->user()->save();
-
-        return to_route('profile.edit');
     }
 
     /**
-     * Delete the user's profile.
+     * Update user profile.
      */
-    public function destroy(Request $request): RedirectResponse
+    public function update(ProfileUpdateRequest $request): JsonResponse
     {
-        $request->validate([
-            'password' => ['required', 'current_password'],
-        ]);
+        try {
+            $user = $this->userService->profileUpdate($request->validated());
 
-        $user = $request->user();
-
-        Auth::logout();
-
-        $user->delete();
-
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
-
-        return redirect('/');
+            return response()->json([
+                'success' => true,
+                'message' => 'Cập nhật profile thành công.',
+                'data' => $user,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cập nhật profile thất bại.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
     }
 }
